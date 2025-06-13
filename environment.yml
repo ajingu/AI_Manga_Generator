@@ -1,0 +1,19 @@
+name: manga_ai
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pillow
+  - pytorch
+  - torchvision
+  - matplotlib
+  - jupyter
+  - pip:
+    - transformers
+    - diffusers
+    - accelerate
+    - safetensors 
