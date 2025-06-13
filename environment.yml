@@ -16,4 +16,7 @@ dependencies:
     - transformers
     - diffusers
     - accelerate
-    - safetensors 
+    - safetensors
+    - gradio
+    - openai
+    - python-dotenv 
