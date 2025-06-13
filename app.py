@@ -17,19 +17,33 @@ load_dotenv()
 # Initialize OpenAI client with API key from .env
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-def generate_manga(prompt):
+def generate_manga(prompt, model_choice):
     # Add manga style to the prompt
     manga_prompt = f"manga style, {prompt}"
     
     try:
-        # Generate image using DALL-E
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=manga_prompt,
-            size="1024x1024",
-            quality="standard",  # DALL-E 3 only supports 'standard' and 'hd'
-            n=1,
-        )
+        # Set parameters based on model choice
+        if model_choice == "DALL-E 2":
+            model = "dall-e-2"
+            size = "512x512"  # Smallest size for DALL-E 2
+            # Generate image using DALL-E 2 (no quality parameter)
+            response = client.images.generate(
+                model=model,
+                prompt=manga_prompt,
+                size=size,
+                n=1,
+            )
+        else:  # DALL-E 3
+            model = "dall-e-3"
+            size = "1024x1024"
+            # Generate image using DALL-E 3 (with quality parameter)
+            response = client.images.generate(
+                model=model,
+                prompt=manga_prompt,
+                size=size,
+                quality="standard",  # Lowest quality for DALL-E 3
+                n=1,
+            )
         
         # Get the image URL
         image_url = response.data[0].url
@@ -50,14 +64,27 @@ def generate_manga(prompt):
 # Create the Gradio interface
 iface = gr.Interface(
     fn=generate_manga,
-    inputs=gr.Textbox(label="Enter your prompt", placeholder="Describe the manga scene you want to generate..."),
+    inputs=[
+        gr.Textbox(label="Enter your prompt", placeholder="Describe the manga scene you want to generate..."),
+        gr.Dropdown(
+            choices=["DALL-E 2", "DALL-E 3"],
+            value="DALL-E 2",
+            label="Select Model",
+            info="DALL-E 2 is cheaper but lower quality. DALL-E 3 is more expensive but higher quality."
+        )
+    ],
     outputs=gr.Image(label="Generated Manga"),
-    title="Manga AI Generator (DALL-E)",
-    description="Generate manga-style images from text descriptions using DALL-E. Enter your prompt and click 'Submit' to generate an image.",
+    title="Manga AI Generator",
+    description="""
+    Generate manga-style images from text descriptions.
+    - DALL-E 2: 512x512 pixels, cheaper ($0.02 per image)
+    - DALL-E 3: 1024x1024 pixels, more expensive ($0.04 per image)
+    Enter your prompt, select a model, and click 'Submit' to generate an image.
+    """,
     examples=[
-        ["A young samurai standing on a mountain peak at sunset"],
-        ["A magical girl transforming with sparkles and ribbons"],
-        ["A cyberpunk city street at night with neon signs"]
+        ["A young samurai standing on a mountain peak at sunset", "DALL-E 2"],
+        ["A magical girl transforming with sparkles and ribbons", "DALL-E 2"],
+        ["A cyberpunk city street at night with neon signs", "DALL-E 3"]
     ]
 )
 
