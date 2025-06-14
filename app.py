@@ -16,6 +16,8 @@ def generate_manga_image(story_prompt: str, style_prompt: str, character_desc: s
     prompt = (
         "A Japanese manga page, black and white, with clear panel borders. "
         "Arrange the panels so that the story is read from right to left, top to bottom, like a traditional Japanese manga. "
+        "Draw empty speech bubbles for dialogue, but do not write any text inside them. "
+        "Leave space for onomatopoeia text, but do not write any onomatopoeia. "
         f"Story: {story_prompt} "
         f"Main character: {character_desc} "
         f"Style: {style_prompt} "
