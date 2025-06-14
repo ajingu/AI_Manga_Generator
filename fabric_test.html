@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fabric.js Square Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    #canvas-container { border: 1px solid #ccc; display: inline-block; }
+    #controls { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>Fabric.js Square & Text Test</h2>
+  <div id="controls">
+    <button onclick="addSquare()">Add Square</button>
+    <input type="file" id="bgImageInput" accept="image/*" onchange="setBackgroundImage(event)">
+  </div>
+  <div id="canvas-container">
+    <canvas id="c" width="800" height="600"></canvas>
+  </div>
+  <script>
+    const canvas = new fabric.Canvas('c', { selection: false });
+
+    function addSquare() {
+      const rect = new fabric.Rect({
+        left: 100,
+        top: 100,
+        fill: 'rgba(255,255,255,0.8)',
+        width: 150,
+        height: 100,
+        stroke: 'black',
+        strokeWidth: 3,
+        angle: 0,
+        hasRotatingPoint: true,
+        cornerColor: 'blue',
+        transparentCorners: false
+      });
+
+      const text = new fabric.IText('Double-click to edit', {
+        left: 100 + 10,
+        top: 100 + 30,
+        fontSize: 20,
+        fill: 'black',
+        editable: true
+      });
+
+      const group = new fabric.Group([rect, text], {
+        left: 100,
+        top: 100,
+        angle: 0
+      });
+
+      canvas.add(group);
+      canvas.setActiveObject(group);
+    }
+
+    // Allow user to set a background image
+    function setBackgroundImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(f) {
+        fabric.Image.fromURL(f.target.result, function(img) {
+          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+            scaleX: canvas.width / img.width,
+            scaleY: canvas.height / img.height
+          });
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Optional: keep text centered in the square when resizing
+    canvas.on('object:scaling', function(e) {
+      const group = e.target;
+      if (group.type === 'group') {
+        const [rect, text] = group._objects;
+        text.set({
+          left: rect.left + (rect.width * rect.scaleX - text.width) / 2,
+          top: rect.top + (rect.height * rect.scaleY - text.height) / 2
+        });
+        group.addWithUpdate();
+      }
+    });
+
+    // Double-click to edit text inside the group
+    canvas.on('mouse:dblclick', function(opt) {
+      const target = opt.target;
+      if (target && target.type === 'group') {
+        // Convert group to active selection to update child positions
+        target.toActiveSelection();
+        canvas.requestRenderAll();
+
+        // Find the IText object in the selection
+        const activeObjects = canvas.getActiveObjects();
+        const textObj = activeObjects.find(obj => obj.type === 'i-text');
+        const rectObj = activeObjects.find(obj => obj.type === 'rect');
+        if (textObj && rectObj) {
+          // Remove both from canvas (they are now at correct absolute positions)
+          canvas.remove(rectObj);
+          canvas.remove(textObj);
+          canvas.discardActiveObject();
+          canvas.add(rectObj);
+          canvas.add(textObj);
+          canvas.setActiveObject(textObj);
+          textObj.enterEditing();
+          textObj.selectAll();
+          // When editing is exited, regroup
+          textObj.on('editing:exited', function() {
+            // Remove both from canvas
+            canvas.remove(rectObj);
+            canvas.remove(textObj);
+            // Regroup
+            const newGroup = new fabric.Group([rectObj, textObj], {
+              left: rectObj.left,
+              top: rectObj.top,
+              angle: rectObj.angle
+            });
+            canvas.add(newGroup);
+            canvas.setActiveObject(newGroup);
+          });
+        }
+      }
+    });
+  </script>
+</body>
+</html> 
