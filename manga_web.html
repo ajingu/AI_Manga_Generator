@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manga Page Generator</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    #output-img { border: 1px solid #ccc; margin-top: 1em; max-width: 100%; }
+    #loading { display: none; color: #888; }
+    label { display: block; margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h2>Manga Page Generator</h2>
+  <form id="manga-form">
+    <label>
+      Story:
+      <textarea id="story" rows="4" cols="60" placeholder="Enter your manga story..." required></textarea>
+    </label>
+    <label>
+      Style:
+      <input id="style" type="text" value="shoujo manga style, soft colors, detailed backgrounds" />
+    </label>
+    <label>
+      Character:
+      <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" />
+    </label>
+    <button type="submit">Generate Manga Page</button>
+  </form>
+  <div id="loading">Generating image, please wait...</div>
+  <div id="output">
+    <img id="output-img" src="" alt="Generated manga page will appear here" style="display:none;"/>
+  </div>
+  <script>
+    document.getElementById('manga-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const story = document.getElementById('story').value;
+      const style = document.getElementById('style').value;
+      const character = document.getElementById('character').value;
+      const loading = document.getElementById('loading');
+      const img = document.getElementById('output-img');
+      loading.style.display = 'block';
+      img.style.display = 'none';
+      fetch('http://localhost:5001/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story, style, character })
+      })
+      .then(response => {
+        loading.style.display = 'none';
+        if (!response.ok) throw new Error('Failed to generate image');
+        return response.blob();
+      })
+      .then(blob => {
+        img.src = URL.createObjectURL(blob);
+        img.style.display = 'block';
+      })
+      .catch(err => {
+        loading.style.display = 'none';
+        alert('Error: ' + err.message);
+      });
+    });
+  </script>
+</body>
+</html> 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Fabric.js Square Test</title>
+  <title>Fabric.js Speech Bubble Test</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
   <style>
     body { font-family: sans-serif; }
@@ -11,9 +11,9 @@
   </style>
 </head>
 <body>
-  <h2>Fabric.js Square & Text Test</h2>
+  <h2>Fabric.js Speech Bubble & Text Test</h2>
   <div id="controls">
-    <button onclick="addSquare()">Add Square</button>
+    <button onclick="addSpeechBubble()">Add Speech Bubble</button>
     <input type="file" id="bgImageInput" accept="image/*" onchange="setBackgroundImage(event)">
   </div>
   <div id="canvas-container">
@@ -22,38 +22,99 @@
   <script>
     const canvas = new fabric.Canvas('c', { selection: false });
 
-    function addSquare() {
-      const rect = new fabric.Rect({
-        left: 100,
-        top: 100,
-        fill: 'rgba(255,255,255,0.8)',
-        width: 150,
-        height: 100,
+    function addSpeechBubble() {
+      // Main bubble (ellipse)
+      const ellipse = new fabric.Ellipse({
+        left: 200,
+        top: 150,
+        rx: 75,
+        ry: 50,
+        fill: 'rgba(255,255,255,0.9)',
         stroke: 'black',
         strokeWidth: 3,
         angle: 0,
-        hasRotatingPoint: true,
-        cornerColor: 'blue',
-        transparentCorners: false
+        selectable: false
       });
 
+      // Tail (triangle)
+      const tail = new fabric.Triangle({
+        left: 250,
+        top: 200,
+        width: 30,
+        height: 30,
+        fill: 'rgba(255,255,255,0.9)',
+        stroke: 'black',
+        strokeWidth: 3,
+        angle: 45,
+        selectable: false
+      });
+
+      // Editable text
       const text = new fabric.IText('Double-click to edit', {
-        left: 100 + 10,
-        top: 100 + 30,
+        left: 200,
+        top: 150,
         fontSize: 20,
         fill: 'black',
-        editable: true
+        editable: true,
+        originX: 'center',
+        originY: 'center'
       });
 
-      const group = new fabric.Group([rect, text], {
-        left: 100,
-        top: 100,
+      // Group them together
+      const group = new fabric.Group([ellipse, tail, text], {
+        left: 200,
+        top: 150,
         angle: 0
       });
 
       canvas.add(group);
       canvas.setActiveObject(group);
     }
+
+    // Double-click to edit text inside the group
+    canvas.on('mouse:dblclick', function(opt) {
+      const target = opt.target;
+      if (target && target.type === 'group') {
+        // Convert group to active selection to update child positions
+        target.toActiveSelection();
+        canvas.requestRenderAll();
+
+        // Find the IText object in the selection
+        const activeObjects = canvas.getActiveObjects();
+        const textObj = activeObjects.find(obj => obj.type === 'i-text');
+        const ellipseObj = activeObjects.find(obj => obj.type === 'ellipse');
+        const tailObj = activeObjects.find(obj => obj.type === 'triangle');
+        if (textObj && ellipseObj && tailObj) {
+          // Remove all from canvas (they are now at correct absolute positions)
+          canvas.remove(ellipseObj);
+          canvas.remove(tailObj);
+          canvas.remove(textObj);
+          canvas.discardActiveObject();
+          canvas.add(ellipseObj);
+          canvas.add(tailObj);
+          canvas.add(textObj);
+          canvas.setActiveObject(textObj);
+          textObj.enterEditing();
+          textObj.selectAll();
+          // When editing is exited, regroup
+          textObj.on('editing:exited', function handler() {
+            // Remove all from canvas
+            canvas.remove(ellipseObj);
+            canvas.remove(tailObj);
+            canvas.remove(textObj);
+            // Regroup
+            const newGroup = new fabric.Group([ellipseObj, tailObj, textObj], {
+              left: ellipseObj.left,
+              top: ellipseObj.top,
+              angle: ellipseObj.angle
+            });
+            canvas.add(newGroup);
+            canvas.setActiveObject(newGroup);
+            textObj.off('editing:exited', handler); // Remove this handler
+          });
+        }
+      }
+    });
 
     // Allow user to set a background image
     function setBackgroundImage(event) {
@@ -70,59 +131,6 @@
       };
       reader.readAsDataURL(file);
     }
-
-    // Optional: keep text centered in the square when resizing
-    canvas.on('object:scaling', function(e) {
-      const group = e.target;
-      if (group.type === 'group') {
-        const [rect, text] = group._objects;
-        text.set({
-          left: rect.left + (rect.width * rect.scaleX - text.width) / 2,
-          top: rect.top + (rect.height * rect.scaleY - text.height) / 2
-        });
-        group.addWithUpdate();
-      }
-    });
-
-    // Double-click to edit text inside the group
-    canvas.on('mouse:dblclick', function(opt) {
-      const target = opt.target;
-      if (target && target.type === 'group') {
-        // Convert group to active selection to update child positions
-        target.toActiveSelection();
-        canvas.requestRenderAll();
-
-        // Find the IText object in the selection
-        const activeObjects = canvas.getActiveObjects();
-        const textObj = activeObjects.find(obj => obj.type === 'i-text');
-        const rectObj = activeObjects.find(obj => obj.type === 'rect');
-        if (textObj && rectObj) {
-          // Remove both from canvas (they are now at correct absolute positions)
-          canvas.remove(rectObj);
-          canvas.remove(textObj);
-          canvas.discardActiveObject();
-          canvas.add(rectObj);
-          canvas.add(textObj);
-          canvas.setActiveObject(textObj);
-          textObj.enterEditing();
-          textObj.selectAll();
-          // When editing is exited, regroup
-          textObj.on('editing:exited', function() {
-            // Remove both from canvas
-            canvas.remove(rectObj);
-            canvas.remove(textObj);
-            // Regroup
-            const newGroup = new fabric.Group([rectObj, textObj], {
-              left: rectObj.left,
-              top: rectObj.top,
-              angle: rectObj.angle
-            });
-            canvas.add(newGroup);
-            canvas.setActiveObject(newGroup);
-          });
-        }
-      }
-    });
   </script>
 </body>
 </html> 

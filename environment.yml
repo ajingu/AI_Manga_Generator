@@ -1,22 +1,25 @@
 name: manga_ai
 channels:
-  - pytorch
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - python=3.10
   - pip
+  - pip:
+      - openai
+      - flask
+      - flask-cors
+      - python-dotenv
+      - pillow
   - numpy
   - pillow
   - pytorch
   - torchvision
   - matplotlib
   - jupyter
-  - pip:
-    - transformers
-    - diffusers
-    - accelerate
-    - safetensors
-    - gradio
-    - openai
-    - python-dotenv 
+  - transformers
+  - diffusers
+  - accelerate
+  - safetensors
+  - gradio
+  - python-dotenv 
