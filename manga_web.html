@@ -281,7 +281,7 @@
       <form id="manga-form">
         <div class="form-group">
           <label for="story">Story</label>
-          <textarea id="story" required placeholder="Describe your manga story...">A young student discovers she can talk to cats. One day, while walking home from school, she meets a mysterious black cat who tells her about a hidden magical world existing parallel to our own. The cat becomes her guide to this new realm.</textarea>
+          <textarea id="story" required placeholder="Describe your manga story...">A young student discovers she can talk to cats. One day, while walking home from school, she meets a mysterious black cat who tells her about a hidden magical world existing parallel to our own. The cat guides her to the gate that connects to the magical world.</textarea>
         </div>
         
         <div class="form-group">
@@ -291,7 +291,7 @@
         
         <div class="form-group">
           <label for="character">Main Character</label>
-          <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" placeholder="Describe the main character..."/>
+          <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf; a black cat with a red collar;" placeholder="Describe the main character..."/>
         </div>
         
         <button type="submit" class="btn btn-primary">Generate Manga Page</button>
@@ -300,7 +300,9 @@
              <div class="tips">
          <h3>💡 Tips</h3>
          <ul>
-           <li>Double-click text to edit speech bubbles</li>
+           <li>Double-click text or bubble to edit speech bubbles</li>
+           <li>Single-click bubble to select and resize/move it</li>
+           <li>Single-click text to select and move it independently</li>
            <li>Use "Auto-Place" for intelligent bubble positioning</li>
            <li>Drag bubbles to reposition them manually</li>
            <li>Use descriptive stories for better results</li>
@@ -407,7 +409,7 @@
 
       // Set width constraint and text properties
       textObj.set({
-        width: oval.rx * 0.6,  // Much narrower text width (about 10 chars)
+        width: oval.rx * 0.4,  // Much narrower text width (about 6-8 chars)
         breakWords: false,  // Don't break words
         splitByGrapheme: false,  // Don't split words
         textAlign: 'center'
@@ -417,9 +419,13 @@
       textObj.dirty = true;
       textObj.initDimensions();
 
-      // Adjust font size if text is too tall
-      const maxHeight = oval.ry * 1.6;
-      let fontSize = textObj.fontSize || 18;
+      // Adjust font size if text is too tall - start with smaller font
+      const maxHeight = oval.ry * 1.4;
+      let fontSize = Math.min(14, oval.rx / 6);  // Smaller initial font size
+      textObj.set({ fontSize: fontSize });
+      textObj.dirty = true;
+      textObj.initDimensions();
+      
       while (textObj.height > maxHeight && fontSize > 8) {
         fontSize -= 1;
         textObj.set({ fontSize: fontSize });
@@ -701,7 +707,7 @@
         strokeWidth: 2,
         originX: 'center',
         originY: 'center',
-        selectable: true,
+        selectable: true,  // Keep bubble selectable
         // Add slight irregularity for hand-drawn manga look
         scaleX: 1 + (Math.random() - 0.5) * 0.1,
         scaleY: 1 + (Math.random() - 0.5) * 0.1,
@@ -713,15 +719,15 @@
       const textObj = new fabric.Text(text, {
         left: x,
         top: y,
-        fontSize: 18,
+        fontSize: 14,  // Smaller font size
         fontFamily: 'Arial, sans-serif',
         fontWeight: 'bold',
         fill: 'black',
         textAlign: 'center',
         originX: 'center',
         originY: 'center',
-        selectable: true,
-        width: rx * 0.6,  // Make text width much narrower (about 10 chars)
+        selectable: true,  // Keep text selectable
+        width: rx * 0.4,  // Much narrower text width (about 6-8 chars)
         breakWords: false,  // Don't break words
         splitByGrapheme: false,  // Don't split words
         // Add type for identification
@@ -765,7 +771,8 @@
           originX: this.originX,
           originY: this.originY,
           width: this.width,
-          breakWords: true,
+          breakWords: false,
+          splitByGrapheme: false,
           editingBorderColor: '#667eea',
           cursorColor: '#667eea'
         });
@@ -784,7 +791,7 @@
           // Update the original text object
           textObj.set({
             'text': this.text,
-            'width': rx * 1.5  // Ensure width is set for wrapping
+            'width': oval.rx * 0.4  // Maintain narrow width
           });
           
           // Remove the temporary IText
@@ -801,6 +808,29 @@
         });
       });
       
+      // Also allow double-click on oval to edit text
+      oval.on('mousedblclick', function() {
+        if (this.pairedText) {
+          // Trigger the text editing
+          this.pairedText.fire('mousedblclick');
+        }
+      });
+
+      // Single click on oval selects the oval itself (for resizing/moving)
+      oval.on('mousedown', function(e) {
+        // Only auto-select text if it's not already being edited
+        if (!canvas.getActiveObject() || canvas.getActiveObject().type !== 'i-text') {
+          canvas.setActiveObject(this);
+          canvas.renderAll();
+        }
+      });
+
+      // Ensure text stays selectable
+      textObj.on('mousedown', function() {
+        canvas.setActiveObject(this);
+        canvas.renderAll();
+      });
+
       oval.on('moving', function() {
         if (this.pairedText && !this.isUpdating && !this.pairedText.isUpdating) {
           this.pairedText.isUpdating = true;
@@ -876,7 +906,7 @@
       const textObj = new fabric.IText(text, {
         left: x,
         top: y,
-        fontSize: textMetrics.fontSize,
+        fontSize: Math.min(14, adjustedRx / 6),  // Smaller, adaptive font size
         fontFamily: 'Arial, sans-serif',
         fontWeight: 'bold',
         fill: 'black',
@@ -885,7 +915,7 @@
         originY: 'center',
         selectable: false,
         editable: true,
-        width: adjustedRx * 0.6, // Much narrower text width (about 10 chars)
+        width: adjustedRx * 0.4, // Much narrower text width (about 6-8 chars)
         breakWords: false, // Don't break words
         splitByGrapheme: false, // Don't split words
         editingBorderColor: '#667eea',
