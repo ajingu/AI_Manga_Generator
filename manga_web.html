@@ -469,7 +469,152 @@
       return { rx, ry };
     }
 
-    function createSpeechBubble(x, y, rx = 100, ry = 60) {
+    // Extract image data for a specific panel
+    function extractPanelImageData(imageData, panelInfo, imageWidth, imageHeight) {
+      if (!panelInfo.minX || !panelInfo.minY || !panelInfo.maxX || !panelInfo.maxY) {
+        return null;
+      }
+      
+      const panelWidth = panelInfo.maxX - panelInfo.minX;
+      const panelHeight = panelInfo.maxY - panelInfo.minY;
+      const panelData = new Uint8ClampedArray(panelWidth * panelHeight * 4);
+      
+      let panelIndex = 0;
+      for (let y = panelInfo.minY; y < panelInfo.maxY; y++) {
+        for (let x = panelInfo.minX; x < panelInfo.maxX; x++) {
+          const sourceIndex = (y * imageWidth + x) * 4;
+          panelData[panelIndex] = imageData.data[sourceIndex];     // R
+          panelData[panelIndex + 1] = imageData.data[sourceIndex + 1]; // G
+          panelData[panelIndex + 2] = imageData.data[sourceIndex + 2]; // B
+          panelData[panelIndex + 3] = imageData.data[sourceIndex + 3]; // A
+          panelIndex += 4;
+        }
+      }
+      
+      return {
+        data: panelData,
+        width: panelWidth,
+        height: panelHeight,
+        position: panelInfo
+      };
+    }
+
+    // Analyze panel content and generate appropriate dialogue
+    async function generateDialogueForPanel(panelImageData, panelInfo, panelIndex) {
+      try {
+        // Analyze panel content to determine dialogue context
+        const contentAnalysis = analyzePanelContent(panelImageData);
+        
+        // Get the current story context
+        const storyContext = document.getElementById('story').value;
+        const characterDesc = document.getElementById('character').value;
+        
+        // Generate dialogue based on panel position and content
+        const dialogue = await generateContextualDialogue(
+          contentAnalysis, 
+          panelIndex, 
+          storyContext, 
+          characterDesc
+        );
+        
+        return dialogue;
+      } catch (error) {
+        console.error('Error generating dialogue:', error);
+        return getDefaultDialogue(panelIndex);
+      }
+    }
+
+    // Analyze panel content to understand what's happening
+    function analyzePanelContent(panelImageData) {
+      if (!panelImageData) {
+        return { type: 'unknown', intensity: 'medium' };
+      }
+      
+      const data = panelImageData.data;
+      let darkPixels = 0;
+      let totalPixels = data.length / 4;
+      let edgePixels = 0;
+      
+      // Analyze pixel distribution
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const brightness = (r + g + b) / 3;
+        
+        if (brightness < 128) darkPixels++;
+        if (brightness < 50 || brightness > 200) edgePixels++;
+      }
+      
+      const darkRatio = darkPixels / totalPixels;
+      const edgeRatio = edgePixels / totalPixels;
+      
+      // Determine scene type based on analysis
+      let sceneType = 'dialogue';
+      let intensity = 'medium';
+      
+      if (darkRatio > 0.6) {
+        sceneType = 'dramatic';
+        intensity = 'high';
+      } else if (darkRatio < 0.2) {
+        sceneType = 'peaceful';
+        intensity = 'low';
+      } else if (edgeRatio > 0.7) {
+        sceneType = 'action';
+        intensity = 'high';
+      }
+      
+      return { type: sceneType, intensity, darkRatio, edgeRatio };
+    }
+
+    // Generate contextual dialogue using AI
+    async function generateContextualDialogue(contentAnalysis, panelIndex, storyContext, characterDesc) {
+      const prompt = `
+        Generate a short manga dialogue (1-8 words) for panel ${panelIndex + 1}.
+        
+        Story context: ${storyContext}
+        Character: ${characterDesc}
+        Scene type: ${contentAnalysis.type}
+        Scene intensity: ${contentAnalysis.intensity}
+        
+        Panel position: ${panelIndex === 0 ? 'Opening' : panelIndex === 1 ? 'Development' : panelIndex === 2 ? 'Climax' : 'Resolution'}
+        
+        Generate dialogue that fits this specific panel in the story progression.
+        Return only the dialogue text, no quotes or extra formatting.
+      `;
+
+      try {
+        const response = await fetch('http://localhost:5001/generate-dialogue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        
+        if (response.ok) {
+          const result = await response.text();
+          return result.trim();
+        } else {
+          throw new Error('API request failed');
+        }
+      } catch (error) {
+        console.error('Failed to generate AI dialogue:', error);
+        return getDefaultDialogue(panelIndex);
+      }
+    }
+
+    // Fallback dialogue based on panel position
+    function getDefaultDialogue(panelIndex) {
+      const defaultDialogues = [
+        "What's that?",
+        "I can't believe it!",
+        "This is amazing!",
+        "Let's go together!"
+      ];
+      
+      return defaultDialogues[panelIndex % defaultDialogues.length];
+    }
+
+    function createSpeechBubble(x, y, rx = 100, ry = 60, text = 'Double-click to edit') {
       // Create oval shape for bubble
       const oval = new fabric.Ellipse({
         left: x,
@@ -485,7 +630,7 @@
       });
 
       // Create editable text - NOT grouped
-      const text = new fabric.IText('Double-click to edit', {
+      const textObj = new fabric.IText(text, {
         left: x,
         top: y,
         fontSize: 18,
@@ -509,16 +654,16 @@
 
       // Add both objects to canvas separately
       canvas.add(oval);
-      canvas.add(text);
+      canvas.add(textObj);
       console.log('Added oval and text to canvas at:', x, y);
 
       // Store reference to paired object with stronger binding
-      oval.pairedText = text;
-      text.pairedOval = oval;
+      oval.pairedText = textObj;
+      textObj.pairedOval = oval;
       
       // Add custom properties to identify paired objects
       oval.bubbleId = Date.now() + Math.random();
-      text.bubbleId = oval.bubbleId;
+      textObj.bubbleId = oval.bubbleId;
 
       // Sync movement
       oval.on('moving', function() {
@@ -530,7 +675,7 @@
         }
       });
 
-      text.on('moving', function() {
+      textObj.on('moving', function() {
         if (this.pairedOval) {
           this.pairedOval.set({
             left: this.left,
@@ -539,7 +684,7 @@
         }
       });
 
-      return { oval, text };
+      return { oval, textObj };
     }
 
     function calculateBubblePositions() {
@@ -581,10 +726,13 @@
       const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       const positions = detectPanelCenters(imageData, tempCanvas.width, tempCanvas.height, imageObj);
       
-             // Place bubbles at detected positions with adaptive sizing
-       positions.forEach(pos => {
+             // Place bubbles at detected positions with adaptive sizing and auto-generated text
+       positions.forEach((pos, index) => {
          const bubbleSize = calculateBubbleSize(pos.width, pos.height);
-         createSpeechBubble(pos.x, pos.y, bubbleSize.rx, bubbleSize.ry);
+         const panelImageData = extractPanelImageData(imageData, pos, tempCanvas.width, tempCanvas.height);
+         generateDialogueForPanel(panelImageData, pos, index).then(dialogue => {
+           createSpeechBubble(pos.x, pos.y, bubbleSize.rx, bubbleSize.ry, dialogue);
+         });
        });
       
       canvas.renderAll();

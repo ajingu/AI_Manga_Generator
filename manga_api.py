@@ -48,5 +48,31 @@ def generate():
     image_bytes = base64.b64decode(image_base64)
     return send_file(io.BytesIO(image_bytes), mimetype='image/png')
 
+@app.route('/generate-dialogue', methods=['POST'])
+def generate_dialogue():
+    data = request.json
+    prompt = data.get('prompt', '')
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a manga dialogue writer. Generate short, impactful dialogue that fits manga speech bubbles. Keep responses to 1-8 words maximum. Be expressive and match the scene context."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=50,
+            temperature=0.8
+        )
+        
+        dialogue = response.choices[0].message.content.strip()
+        # Remove quotes if present
+        dialogue = dialogue.strip('"\'')
+        
+        return dialogue
+        
+    except Exception as e:
+        print(f"Error generating dialogue: {e}")
+        return "Hello!", 200
+
 if __name__ == '__main__':
     app.run(port=5001, debug=True) 
