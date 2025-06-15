@@ -407,9 +407,9 @@
 
       // Set width constraint and text properties
       textObj.set({
-        width: oval.rx * 1.5,  // Consistent with initial creation
-        breakWords: true,
-        splitByGrapheme: true,
+        width: oval.rx * 0.6,  // Much narrower text width (about 10 chars)
+        breakWords: false,  // Don't break words
+        splitByGrapheme: false,  // Don't split words
         textAlign: 'center'
       });
 
@@ -696,7 +696,7 @@
         top: y,
         rx: rx,
         ry: ry,
-        fill: 'white',
+        fill: 'rgba(255, 255, 255, 0.8)',  // Make bubble semi-transparent
         stroke: 'black',
         strokeWidth: 2,
         originX: 'center',
@@ -721,8 +721,9 @@
         originX: 'center',
         originY: 'center',
         selectable: true,
-        width: rx * 1.5,
-        breakWords: true,
+        width: rx * 0.6,  // Make text width much narrower (about 10 chars)
+        breakWords: false,  // Don't break words
+        splitByGrapheme: false,  // Don't split words
         // Add type for identification
         type: 'speechBubbleText'
       });
@@ -857,7 +858,7 @@
         top: y,
         rx: adjustedRx,
         ry: adjustedRy,
-        fill: 'white',
+        fill: 'rgba(255, 255, 255, 0.8)',  // Make bubble semi-transparent
         stroke: 'black',
         strokeWidth: 2,
         originX: 'center',
@@ -884,8 +885,9 @@
         originY: 'center',
         selectable: false,
         editable: true,
-        width: adjustedRx * 1.6, // Text area width
-        splitByGrapheme: true, // Better text wrapping
+        width: adjustedRx * 0.6, // Much narrower text width (about 10 chars)
+        breakWords: false, // Don't break words
+        splitByGrapheme: false, // Don't split words
         editingBorderColor: '#667eea',
         selectionColor: 'rgba(102, 126, 234, 0.3)',
         cursorColor: '#667eea',
