@@ -388,20 +388,80 @@
         if (textObj && textObj.type === 'i-text') {
           textObj.set({
             fill: '#2d3748',
-            backgroundColor: 'transparent'
+            backgroundColor: 'transparent',
+            opacity: 1,
+            visible: true,
+            stroke: null,
+            strokeWidth: 0
           });
         }
       }
+
+          // Simple text fitting function with direct width constraint
+    function fitTextToBubble(textObj, oval, preservePosition = false) {
+      if (!textObj || !oval) return;
+
+      // Store current position if we need to preserve it
+      const currentLeft = textObj.left;
+      const currentTop = textObj.top;
+
+      // Set width constraint and text properties
+      textObj.set({
+        width: oval.rx * 1.5,  // Consistent with initial creation
+        breakWords: true,
+        splitByGrapheme: true,
+        textAlign: 'center'
+      });
+
+      // Force text to recalculate dimensions
+      textObj.dirty = true;
+      textObj.initDimensions();
+
+      // Adjust font size if text is too tall
+      const maxHeight = oval.ry * 1.6;
+      let fontSize = textObj.fontSize || 18;
+      while (textObj.height > maxHeight && fontSize > 8) {
+        fontSize -= 1;
+        textObj.set({ fontSize: fontSize });
+        textObj.dirty = true;
+        textObj.initDimensions();
+      }
+
+      // Position the text
+      if (!preservePosition) {
+        textObj.set({
+          left: oval.left,
+          top: oval.top
+        });
+      } else {
+        textObj.set({
+          left: currentLeft,
+          top: currentTop
+        });
+      }
+
+      // Ensure text visibility
+      textObj.set({
+        fill: '#2d3748',
+        backgroundColor: 'transparent',
+        opacity: 1,
+        visible: true
+      });
+
+      return textObj;
+    }
 
       // Handle all selection events
       canvas.on('selection:created', function(options) {
         options.selected.forEach(obj => {
           if (obj.type === 'i-text') {
             ensureTextVisibility(obj);
+            canvas.bringToFront(obj);
           }
           // If it's an ellipse, check for paired text
           if (obj.type === 'ellipse' && obj.pairedText) {
             ensureTextVisibility(obj.pairedText);
+            canvas.bringToFront(obj.pairedText);
           }
         });
         canvas.renderAll();
@@ -411,10 +471,12 @@
         options.selected.forEach(obj => {
           if (obj.type === 'i-text') {
             ensureTextVisibility(obj);
+            canvas.bringToFront(obj);
           }
           // If it's an ellipse, check for paired text
           if (obj.type === 'ellipse' && obj.pairedText) {
             ensureTextVisibility(obj.pairedText);
+            canvas.bringToFront(obj.pairedText);
           }
         });
         canvas.renderAll();
@@ -436,10 +498,12 @@
         if (target) {
           if (target.type === 'i-text') {
             ensureTextVisibility(target);
+            canvas.bringToFront(target);
           }
-          // If clicking on ellipse, ensure paired text stays visible
+          // If clicking on ellipse, ensure paired text stays visible and on top
           if (target.type === 'ellipse' && target.pairedText) {
             ensureTextVisibility(target.pairedText);
+            canvas.bringToFront(target.pairedText);
           }
         }
         canvas.renderAll();
@@ -454,6 +518,17 @@
         });
         canvas.renderAll();
       });
+
+      // Periodic text visibility check
+      setInterval(function() {
+        if (canvas) {
+          canvas.getObjects().forEach(obj => {
+            if (obj.type === 'i-text') {
+              ensureTextVisibility(obj);
+            }
+          });
+        }
+      }, 1000); // Check every second
     }
 
     // Calculate bubble size based on panel dimensions
@@ -615,22 +690,334 @@
     }
 
     function createSpeechBubble(x, y, rx = 100, ry = 60, text = 'Double-click to edit') {
-      // Create oval shape for bubble
+      // Create simple oval shape for bubble
       const oval = new fabric.Ellipse({
         left: x,
         top: y,
         rx: rx,
         ry: ry,
         fill: 'white',
-        stroke: '#667eea',
-        strokeWidth: 3,
+        stroke: 'black',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: true,
+        // Add slight irregularity for hand-drawn manga look
+        scaleX: 1 + (Math.random() - 0.5) * 0.1,
+        scaleY: 1 + (Math.random() - 0.5) * 0.1
+      });
+
+      // Create editable text
+      const textObj = new fabric.IText(text, {
+        left: x,
+        top: y,
+        fontSize: 18,
+        fontFamily: 'Arial, sans-serif',
+        fontWeight: 'bold',
+        fill: 'black',
+        textAlign: 'center',
+        originX: 'center',
+        originY: 'center',
+        selectable: true,
+        editable: true,
+        editingBorderColor: '#667eea',
+        selectionColor: 'rgba(102, 126, 234, 0.3)',
+        cursorColor: '#667eea',
+        backgroundColor: 'transparent',
+        padding: 5,
+        borderColor: '#667eea',
+        cornerColor: '#667eea',
+        cornerSize: 6,
+        transparentCorners: false,
+        width: rx * 1.5,
+        breakWords: true,
+        splitByGrapheme: false,
+        lockUniScaling: true,
+        hasControls: false,
+        hasBorders: false
+      });
+
+      // Add objects to canvas
+      canvas.add(oval);
+      canvas.add(textObj);
+      
+      // Ensure text is always on top
+      canvas.bringToFront(textObj);
+
+      // Store references
+      oval.pairedText = textObj;
+      textObj.pairedOval = oval;
+      
+      // Store initial relative offset between text and oval
+      oval.textOffsetX = textObj.left - oval.left;
+      oval.textOffsetY = textObj.top - oval.top;
+      
+      // Add custom properties to identify paired objects
+      oval.bubbleId = Date.now() + Math.random();
+      textObj.bubbleId = oval.bubbleId;
+
+      // Sync movement and ensure text stays on top
+      oval.isUpdating = false;
+      textObj.isUpdating = false;
+      
+      oval.on('moving', function() {
+        if (this.pairedText && !this.isUpdating && !this.pairedText.isUpdating) {
+          this.pairedText.isUpdating = true;
+          this.pairedText.set({
+            left: this.left + this.textOffsetX,
+            top: this.top + this.textOffsetY
+          });
+          canvas.bringToFront(this.pairedText);
+          this.pairedText.isUpdating = false;
+          canvas.renderAll();
+        }
+      });
+
+      textObj.on('moving', function() {
+        if (this.pairedOval && !this.isUpdating && !this.pairedOval.isUpdating) {
+          this.pairedOval.isUpdating = true;
+          this.pairedOval.textOffsetX = this.left - this.pairedOval.left;
+          this.pairedOval.textOffsetY = this.top - this.pairedOval.top;
+          canvas.bringToFront(this);
+          this.pairedOval.isUpdating = false;
+          canvas.renderAll();
+        }
+      });
+
+      // Handle text editing start
+      textObj.on('editing:entered', function() {
+        this.set({ width: 'auto' });
+        canvas.renderAll();
+      });
+
+      // Handle text editing completion
+      textObj.on('editing:exited', function() {
+        const currentOffsetX = this.left - this.pairedOval.left;
+        const currentOffsetY = this.top - this.pairedOval.top;
+        
+        fitTextToBubble(this, this.pairedOval, true);
+        
+        this.set({
+          left: this.pairedOval.left + currentOffsetX,
+          top: this.pairedOval.top + currentOffsetY
+        });
+        this.pairedOval.textOffsetX = currentOffsetX;
+        this.pairedOval.textOffsetY = currentOffsetY;
+        
+        canvas.bringToFront(this);
+        canvas.renderAll();
+      });
+
+      // Fit text into the bubble initially
+      fitTextToBubble(textObj, oval);
+
+      return { oval, textObj };
+    }
+
+    // Create authentic manga-style speech bubble
+    function createMangaBubbleShape(x, y, rx, ry, text) {
+      // Calculate optimal text size and bubble dimensions
+      const textMetrics = calculateOptimalTextSize(text, rx, ry);
+      
+      // Adjust bubble size if needed for text
+      const adjustedRx = Math.max(rx, textMetrics.minWidth / 2);
+      const adjustedRy = Math.max(ry, textMetrics.minHeight / 2);
+      
+      // Create main bubble (slightly irregular for manga style)
+      const bubble = new fabric.Ellipse({
+        left: x,
+        top: y,
+        rx: adjustedRx,
+        ry: adjustedRy,
+        fill: 'white',
+        stroke: 'black',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        // Add slight irregularity for hand-drawn manga look
+        scaleX: 1 + (Math.random() - 0.5) * 0.1,
+        scaleY: 1 + (Math.random() - 0.5) * 0.1
+      });
+
+      // Create speech bubble tail (pointing down-left, typical manga style)
+      const tail = createBubbleTail(x, y, adjustedRx, adjustedRy);
+      
+      // Create properly sized text
+      const textObj = new fabric.IText(text, {
+        left: x,
+        top: y,
+        fontSize: textMetrics.fontSize,
+        fontFamily: 'Arial, sans-serif',
+        fontWeight: 'bold',
+        fill: 'black',
+        textAlign: 'center',
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        editable: true,
+        width: adjustedRx * 1.6, // Text area width
+        splitByGrapheme: true, // Better text wrapping
+        editingBorderColor: '#667eea',
+        selectionColor: 'rgba(102, 126, 234, 0.3)',
+        cursorColor: '#667eea',
+        backgroundColor: 'transparent',
+        padding: 5,
+        borderColor: '#667eea',
+        cornerColor: '#667eea',
+        cornerSize: 6,
+        transparentCorners: false
+      });
+
+      // Group all elements
+      const group = new fabric.Group([bubble, tail, textObj], {
+        left: x,
+        top: y,
         originX: 'center',
         originY: 'center',
         selectable: true
       });
 
+      // Store references for text editing
+      group.bubbleShape = bubble;
+      group.bubbleTail = tail;
+      group.bubbleText = textObj;
+      group.bubbleId = Date.now() + Math.random();
+
+      return group;
+    }
+
+    // Calculate optimal text size to fit within bubble
+    function calculateOptimalTextSize(text, bubbleRx, bubbleRy) {
+      // Estimate text dimensions
+      const maxWidth = bubbleRx * 1.6; // 80% of bubble width
+      const maxHeight = bubbleRy * 1.4; // 70% of bubble height
+      
+      // Start with a reasonable font size
+      let fontSize = Math.min(20, Math.max(12, bubbleRx / 5));
+      
+      // Estimate text dimensions (rough calculation)
+      const avgCharWidth = fontSize * 0.6;
+      const lineHeight = fontSize * 1.2;
+      const estimatedWidth = text.length * avgCharWidth;
+      const estimatedLines = Math.ceil(estimatedWidth / maxWidth);
+      const estimatedHeight = estimatedLines * lineHeight;
+      
+      // Adjust font size if text doesn't fit
+      if (estimatedHeight > maxHeight) {
+        fontSize = Math.max(10, (maxHeight / estimatedLines) / 1.2);
+      }
+      
+      if (estimatedWidth > maxWidth && estimatedLines === 1) {
+        fontSize = Math.max(10, (maxWidth / text.length) / 0.6);
+      }
+      
+      return {
+        fontSize: Math.round(fontSize),
+        minWidth: Math.min(maxWidth, estimatedWidth),
+        minHeight: Math.min(maxHeight, estimatedHeight)
+      };
+    }
+
+    // Create manga-style speech bubble tail
+    function createBubbleTail(x, y, rx, ry) {
+      // Calculate tail position (bottom-left of bubble)
+      const tailX = x - rx * 0.6;
+      const tailY = y + ry * 0.7;
+      
+      // Create tail using a triangle path
+      const tailPath = `M ${tailX} ${tailY} 
+                       L ${tailX - 15} ${tailY + 25} 
+                       L ${tailX + 10} ${tailY + 15} 
+                       Z`;
+      
+      const tail = new fabric.Path(tailPath, {
+        fill: 'white',
+        stroke: 'black',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: false
+      });
+      
+      return tail;
+    }
+
+    // Temporarily ungroup bubble for text editing
+    function ungroupBubbleForEditing(group) {
+      const bubble = group.bubbleShape;
+      const tail = group.bubbleTail;
+      const textObj = group.bubbleText;
+      const groupLeft = group.left;
+      const groupTop = group.top;
+      
+      // Remove group from canvas
+      canvas.remove(group);
+      
+      // Add individual objects back
+      bubble.set({ left: groupLeft, top: groupTop });
+      tail.set({ left: groupLeft, top: groupTop });
+      textObj.set({ 
+        left: groupLeft, 
+        top: groupTop,
+        selectable: true,
+        fill: 'black'
+      });
+      
+      canvas.add(bubble);
+      canvas.add(tail);
+      canvas.add(textObj);
+      
+      // Enter editing mode
+      textObj.enterEditing();
+      textObj.selectAll();
+      
+      // Set up regroup handler
+      textObj.on('editing:exited', function handler() {
+        regroupBubbleAfterEditing(bubble, tail, textObj, group.bubbleId);
+        textObj.off('editing:exited', handler);
+      });
+      
+      canvas.renderAll();
+    }
+
+    // Regroup bubble after text editing
+    function regroupBubbleAfterEditing(bubble, tail, textObj, bubbleId) {
+      const x = textObj.left;
+      const y = textObj.top;
+      
+      // Remove individual objects
+      canvas.remove(bubble);
+      canvas.remove(tail);
+      canvas.remove(textObj);
+      
+      // Create new group
+      const newGroup = new fabric.Group([bubble, tail, textObj], {
+        left: x,
+        top: y,
+        originX: 'center',
+        originY: 'center',
+        selectable: true
+      });
+      
+      // Restore references
+      newGroup.bubbleShape = bubble;
+      newGroup.bubbleTail = tail;
+      newGroup.bubbleText = textObj;
+      newGroup.bubbleId = bubbleId;
+      
+      // Make text non-selectable again
+      textObj.set({ selectable: false });
+      
+      canvas.add(newGroup);
+      canvas.setActiveObject(newGroup);
+      canvas.renderAll();
+    }
+
+    // Legacy function for manual bubble creation (keeping for compatibility)
+    function createLegacySpeechBubble(x, y, rx = 100, ry = 60, text = 'Double-click to edit') {
       // Create editable text - NOT grouped
-      const textObj = new fabric.IText(text, {
+      const legacyTextObj = new fabric.IText(text, {
         left: x,
         top: y,
         fontSize: 18,
@@ -652,39 +1039,8 @@
         transparentCorners: false
       });
 
-      // Add both objects to canvas separately
-      canvas.add(oval);
-      canvas.add(textObj);
-      console.log('Added oval and text to canvas at:', x, y);
-
-      // Store reference to paired object with stronger binding
-      oval.pairedText = textObj;
-      textObj.pairedOval = oval;
-      
-      // Add custom properties to identify paired objects
-      oval.bubbleId = Date.now() + Math.random();
-      textObj.bubbleId = oval.bubbleId;
-
-      // Sync movement
-      oval.on('moving', function() {
-        if (this.pairedText) {
-          this.pairedText.set({
-            left: this.left,
-            top: this.top
-          });
-        }
-      });
-
-      textObj.on('moving', function() {
-        if (this.pairedOval) {
-          this.pairedOval.set({
-            left: this.left,
-            top: this.top
-          });
-        }
-      });
-
-      return { oval, textObj };
+      // This legacy function is no longer used but kept for reference
+      return null;
     }
 
     function calculateBubblePositions() {
