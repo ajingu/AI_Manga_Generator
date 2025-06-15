@@ -26,6 +26,8 @@ def generate():
     prompt = (
         "A Japanese manga page, black and white, with clear panel borders. "
         "Arrange the panels so that the story is read from right to left, top to bottom, like a traditional Japanese manga. "
+        "DO NOT include any speech bubbles, text, dialogue, or onomatopoeia in the image. "
+        "Show only the visual story panels with characters and backgrounds. "
         f"Story: {story_prompt} "
         f"Main character: {character_desc} "
         f"Style: {style_prompt} "

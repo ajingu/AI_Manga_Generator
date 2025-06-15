@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <title>Manga Page Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <style>
     body { font-family: sans-serif; margin: 2em; }
-    #output-img { border: 1px solid #ccc; margin-top: 1em; max-width: 100%; }
+    #canvas-container { margin-top: 1em; border: 1px solid #ccc; }
     #loading { display: none; color: #888; }
     label { display: block; margin-top: 1em; }
+    .controls { margin-top: 1em; }
+    button { margin-right: 0.5em; }
+    textarea { width: 100%; max-width: 600px; }
   </style>
 </head>
 <body>
@@ -15,32 +19,150 @@
   <form id="manga-form">
     <label>
       Story:
-      <textarea id="story" rows="4" cols="60" placeholder="Enter your manga story..." required></textarea>
+      <textarea id="story" rows="4" cols="60" required>A young student discovers she can talk to cats. One day, while walking home from school, she meets a mysterious black cat who tells her about a hidden magical world existing parallel to our own. The cat becomes her guide to this new realm.</textarea>
     </label>
     <label>
       Style:
-      <input id="style" type="text" value="shoujo manga style, soft colors, detailed backgrounds" />
+      <input id="style" type="text" value="shoujo manga style, soft colors, detailed backgrounds" size="60"/>
     </label>
     <label>
       Character:
-      <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" />
+      <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" size="60"/>
     </label>
     <button type="submit">Generate Manga Page</button>
   </form>
   <div id="loading">Generating image, please wait...</div>
-  <div id="output">
-    <img id="output-img" src="" alt="Generated manga page will appear here" style="display:none;"/>
+  <div class="controls">
+    <button id="add-bubble">Add Speech Bubble</button>
+    <button id="save-image">Save Image</button>
   </div>
+  <div id="canvas-container">
+    <canvas id="manga-canvas"></canvas>
+  </div>
+
   <script>
+    let canvas;
+    let mangaImage;
+    const BUBBLE_COUNT = 3;
+
+    function initCanvas() {
+      canvas = new fabric.Canvas('manga-canvas', {
+        width: 800,
+        height: 1200,
+        backgroundColor: '#ffffff'
+      });
+
+      // Handle double-click for text editing
+      canvas.on('mouse:dblclick', function(options) {
+        const target = options.target;
+        if (target && target.type === 'i-text') {
+          target.enterEditing();
+          target.selectAll();
+        }
+      });
+    }
+
+    function createSpeechBubble(x, y) {
+      // Create oval shape for bubble
+      const oval = new fabric.Ellipse({
+        left: x,
+        top: y,
+        rx: 100,
+        ry: 60,
+        fill: 'white',
+        stroke: 'black',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: true
+      });
+
+      // Create editable text - NOT grouped
+      const text = new fabric.IText('Double-click to edit', {
+        left: x,
+        top: y,
+        fontSize: 18,
+        fontFamily: 'Arial',
+        fill: 'black',
+        textAlign: 'center',
+        originX: 'center',
+        originY: 'center',
+        selectable: true,
+        editable: true,
+        editingBorderColor: 'blue',
+        selectionColor: 'rgba(0, 0, 255, 0.3)',
+        cursorColor: 'blue'
+      });
+
+      // Add both objects to canvas separately
+      canvas.add(oval);
+      canvas.add(text);
+
+      // Store reference to paired object
+      oval.pairedText = text;
+      text.pairedOval = oval;
+
+      // Sync movement
+      oval.on('moving', function() {
+        if (this.pairedText) {
+          this.pairedText.set({
+            left: this.left,
+            top: this.top
+          });
+        }
+      });
+
+      text.on('moving', function() {
+        if (this.pairedOval) {
+          this.pairedOval.set({
+            left: this.left,
+            top: this.top
+          });
+        }
+      });
+
+      return { oval, text };
+    }
+
+    function calculateBubblePositions() {
+      const positions = [];
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      const rows = 3;
+      const cols = 1;
+      
+      for (let i = 0; i < BUBBLE_COUNT; i++) {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        
+        const x = (width / (cols + 1)) * (col + 1);
+        const y = (height / (rows + 1)) * (row + 1);
+        
+        positions.push({ x, y });
+      }
+
+      return positions;
+    }
+
+    function addSpeechBubbles() {
+      const positions = calculateBubblePositions();
+      positions.forEach(pos => {
+        createSpeechBubble(pos.x, pos.y);
+      });
+      canvas.renderAll();
+    }
+
     document.getElementById('manga-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const story = document.getElementById('story').value;
       const style = document.getElementById('style').value;
       const character = document.getElementById('character').value;
       const loading = document.getElementById('loading');
-      const img = document.getElementById('output-img');
+      
       loading.style.display = 'block';
-      img.style.display = 'none';
+      canvas.clear();
+      
       fetch('http://localhost:5001/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,14 +174,51 @@
         return response.blob();
       })
       .then(blob => {
-        img.src = URL.createObjectURL(blob);
-        img.style.display = 'block';
+        const url = URL.createObjectURL(blob);
+        fabric.Image.fromURL(url, function(img) {
+          const scale = Math.min(
+            canvas.width / img.width,
+            canvas.height / img.height
+          );
+          img.scale(scale);
+          
+          img.set({
+            left: (canvas.width - img.width * scale) / 2,
+            top: (canvas.height - img.height * scale) / 2,
+            selectable: false
+          });
+          
+          canvas.add(img);
+          canvas.sendToBack(img);
+          mangaImage = img;
+          
+          addSpeechBubbles();
+        });
       })
       .catch(err => {
         loading.style.display = 'none';
         alert('Error: ' + err.message);
       });
     });
+
+    document.getElementById('add-bubble').addEventListener('click', function() {
+      createSpeechBubble(canvas.width / 2, canvas.height / 2);
+      canvas.renderAll();
+    });
+
+    document.getElementById('save-image').addEventListener('click', function() {
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 1
+      });
+
+      const link = document.createElement('a');
+      link.download = 'manga-page-with-bubbles.png';
+      link.href = dataURL;
+      link.click();
+    });
+
+    window.addEventListener('load', initCanvas);
   </script>
 </body>
 </html> 
