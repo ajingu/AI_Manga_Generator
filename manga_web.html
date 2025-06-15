@@ -171,20 +171,26 @@
       to { transform: rotate(360deg); }
     }
 
-    .canvas-wrapper {
-      background: #f8fafc;
-      border-radius: 16px;
-      padding: 1rem;
-      border: 2px solid #e2e8f0;
-      overflow: hidden;
-    }
+         .canvas-wrapper {
+       background: #f8fafc;
+       border-radius: 16px;
+       padding: 1rem;
+       border: 2px solid #e2e8f0;
+       overflow: hidden;
+       max-width: 100%;
+       display: flex;
+       justify-content: center;
+       align-items: center;
+     }
 
-    #manga-canvas {
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      max-width: 100%;
-      height: auto;
-    }
+     #manga-canvas {
+       border-radius: 12px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+       max-width: 100%;
+       max-height: 80vh;
+       width: auto !important;
+       height: auto !important;
+     }
 
     .feature-badge {
       display: inline-block;
@@ -291,15 +297,16 @@
         <button type="submit" class="btn btn-primary">Generate Manga Page</button>
       </form>
 
-      <div class="tips">
-        <h3>💡 Tips</h3>
-        <ul>
-          <li>Double-click text to edit speech bubbles</li>
-          <li>Drag bubbles to reposition them</li>
-          <li>Use descriptive stories for better results</li>
-          <li>Try different art styles (shoujo, seinen, etc.)</li>
-        </ul>
-      </div>
+             <div class="tips">
+         <h3>💡 Tips</h3>
+         <ul>
+           <li>Double-click text to edit speech bubbles</li>
+           <li>Use "Auto-Place" for intelligent bubble positioning</li>
+           <li>Drag bubbles to reposition them manually</li>
+           <li>Use descriptive stories for better results</li>
+           <li>Try different art styles (shoujo, seinen, etc.)</li>
+         </ul>
+       </div>
     </div>
 
     <div class="main-content">
@@ -309,10 +316,12 @@
         Generating your manga page...
       </div>
       
-      <div class="controls">
-        <button id="add-bubble" class="btn btn-secondary">+ Add Speech Bubble</button>
-        <button id="save-image" class="btn btn-secondary">💾 Save Image</button>
-      </div>
+             <div class="controls">
+         <button id="add-bubble" class="btn btn-secondary">+ Add Speech Bubble</button>
+         <button id="auto-place" class="btn btn-secondary">🎯 Auto-Place Bubbles</button>
+         <button id="clear-bubbles" class="btn btn-secondary">🗑️ Clear Bubbles</button>
+         <button id="save-image" class="btn btn-secondary">💾 Save Image</button>
+       </div>
       
       <div class="canvas-wrapper">
         <canvas id="manga-canvas"></canvas>
@@ -326,9 +335,13 @@
     const BUBBLE_COUNT = 3;
 
     function initCanvas() {
+      // Calculate responsive canvas size
+      const maxWidth = Math.min(800, window.innerWidth - 100);
+      const maxHeight = Math.min(1000, window.innerHeight - 200);
+      
       canvas = new fabric.Canvas('manga-canvas', {
-        width: 800,
-        height: 1200,
+        width: maxWidth,
+        height: maxHeight,
         backgroundColor: '#ffffff'
       });
 
@@ -336,19 +349,133 @@
       canvas.on('mouse:dblclick', function(options) {
         const target = options.target;
         if (target && target.type === 'i-text') {
+          // Ensure text is visible and properly styled during editing
+          target.set({
+            fill: '#2d3748',
+            backgroundColor: 'transparent'
+          });
           target.enterEditing();
           target.selectAll();
+          canvas.renderAll();
         }
+      });
+
+      // Handle text editing events
+      canvas.on('text:editing:entered', function(options) {
+        const target = options.target;
+        if (target) {
+          target.set({
+            fill: '#2d3748',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+          });
+          canvas.renderAll();
+        }
+      });
+
+      canvas.on('text:editing:exited', function(options) {
+        const target = options.target;
+        if (target) {
+          target.set({
+            fill: '#2d3748',
+            backgroundColor: 'transparent'
+          });
+          canvas.renderAll();
+        }
+      });
+
+      // Comprehensive text color protection
+      function ensureTextVisibility(textObj) {
+        if (textObj && textObj.type === 'i-text') {
+          textObj.set({
+            fill: '#2d3748',
+            backgroundColor: 'transparent'
+          });
+        }
+      }
+
+      // Handle all selection events
+      canvas.on('selection:created', function(options) {
+        options.selected.forEach(obj => {
+          if (obj.type === 'i-text') {
+            ensureTextVisibility(obj);
+          }
+          // If it's an ellipse, check for paired text
+          if (obj.type === 'ellipse' && obj.pairedText) {
+            ensureTextVisibility(obj.pairedText);
+          }
+        });
+        canvas.renderAll();
+      });
+
+      canvas.on('selection:updated', function(options) {
+        options.selected.forEach(obj => {
+          if (obj.type === 'i-text') {
+            ensureTextVisibility(obj);
+          }
+          // If it's an ellipse, check for paired text
+          if (obj.type === 'ellipse' && obj.pairedText) {
+            ensureTextVisibility(obj.pairedText);
+          }
+        });
+        canvas.renderAll();
+      });
+
+      canvas.on('selection:cleared', function() {
+        // Ensure all text objects remain visible when selection is cleared
+        canvas.getObjects().forEach(obj => {
+          if (obj.type === 'i-text') {
+            ensureTextVisibility(obj);
+          }
+        });
+        canvas.renderAll();
+      });
+
+      // Handle mouse events
+      canvas.on('mouse:down', function(options) {
+        const target = options.target;
+        if (target) {
+          if (target.type === 'i-text') {
+            ensureTextVisibility(target);
+          }
+          // If clicking on ellipse, ensure paired text stays visible
+          if (target.type === 'ellipse' && target.pairedText) {
+            ensureTextVisibility(target.pairedText);
+          }
+        }
+        canvas.renderAll();
+      });
+
+      canvas.on('mouse:up', function(options) {
+        // Double-check text visibility after any mouse interaction
+        canvas.getObjects().forEach(obj => {
+          if (obj.type === 'i-text') {
+            ensureTextVisibility(obj);
+          }
+        });
+        canvas.renderAll();
       });
     }
 
-    function createSpeechBubble(x, y) {
+    // Calculate bubble size based on panel dimensions
+    function calculateBubbleSize(panelWidth, panelHeight) {
+      if (!panelWidth || !panelHeight) {
+        return { rx: 100, ry: 60 }; // Default size
+      }
+      
+      // Scale bubble size based on panel size
+      const rx = Math.max(60, Math.min(150, panelWidth * 0.3));
+      const ry = Math.max(40, Math.min(100, panelHeight * 0.2));
+      
+      return { rx, ry };
+    }
+
+    function createSpeechBubble(x, y, rx = 100, ry = 60) {
       // Create oval shape for bubble
       const oval = new fabric.Ellipse({
         left: x,
         top: y,
-        rx: 100,
-        ry: 60,
+        rx: rx,
+        ry: ry,
         fill: 'white',
         stroke: '#667eea',
         strokeWidth: 3,
@@ -371,7 +498,13 @@
         editable: true,
         editingBorderColor: '#667eea',
         selectionColor: 'rgba(102, 126, 234, 0.3)',
-        cursorColor: '#667eea'
+        cursorColor: '#667eea',
+        backgroundColor: 'transparent',
+        padding: 5,
+        borderColor: '#667eea',
+        cornerColor: '#667eea',
+        cornerSize: 6,
+        transparentCorners: false
       });
 
       // Add both objects to canvas separately
@@ -379,9 +512,13 @@
       canvas.add(text);
       console.log('Added oval and text to canvas at:', x, y);
 
-      // Store reference to paired object
+      // Store reference to paired object with stronger binding
       oval.pairedText = text;
       text.pairedOval = oval;
+      
+      // Add custom properties to identify paired objects
+      oval.bubbleId = Date.now() + Math.random();
+      text.bubbleId = oval.bubbleId;
 
       // Sync movement
       oval.on('moving', function() {
@@ -426,12 +563,253 @@
       return positions;
     }
 
-    function addSpeechBubbles() {
-      const positions = calculateBubblePositions();
-      positions.forEach(pos => {
-        createSpeechBubble(pos.x, pos.y);
-      });
+    // Analyze image to detect panels and place bubbles automatically
+    function analyzeImageAndPlaceBubbles(imageObj) {
+      // Create a temporary canvas to analyze the image
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      // Set canvas size to match the scaled image
+      const scale = imageObj.scaleX;
+      tempCanvas.width = imageObj.width * scale;
+      tempCanvas.height = imageObj.height * scale;
+      
+      // Draw the image to analyze it
+      tempCtx.drawImage(imageObj._element, 0, 0, tempCanvas.width, tempCanvas.height);
+      
+      // Get image data for analysis
+      const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const positions = detectPanelCenters(imageData, tempCanvas.width, tempCanvas.height, imageObj);
+      
+             // Place bubbles at detected positions with adaptive sizing
+       positions.forEach(pos => {
+         const bubbleSize = calculateBubbleSize(pos.width, pos.height);
+         createSpeechBubble(pos.x, pos.y, bubbleSize.rx, bubbleSize.ry);
+       });
+      
       canvas.renderAll();
+    }
+
+    // Detect panel centers using contour detection
+    function detectPanelCenters(imageData, width, height, imageObj) {
+      const positions = [];
+      const data = imageData.data;
+      
+      // Calculate the offset of the image on the canvas
+      const imageLeft = imageObj.left;
+      const imageTop = imageObj.top;
+      
+      // Convert to grayscale and detect edges
+      const grayData = convertToGrayscale(data, width, height);
+      const edges = detectEdges(grayData, width, height);
+      const contours = findContours(edges, width, height);
+      
+      // Filter contours to find panel boxes
+      const panels = filterPanelContours(contours, width, height);
+      
+      console.log(`Detected ${panels.length} panels`);
+      
+      // Place one bubble in the center of each detected panel
+      panels.forEach(panel => {
+        const centerX = imageLeft + panel.centerX;
+        const centerY = imageTop + panel.centerY;
+        
+        positions.push({
+          x: centerX,
+          y: centerY,
+          width: panel.width,
+          height: panel.height
+        });
+      });
+      
+      // Fallback if no panels detected
+      if (positions.length === 0) {
+        console.log('No panels detected, using fallback positioning');
+        positions.push(
+          { x: imageLeft + width * 0.3, y: imageTop + height * 0.3 },
+          { x: imageLeft + width * 0.7, y: imageTop + height * 0.7 }
+        );
+      }
+      
+      return positions;
+    }
+
+    // Convert image data to grayscale
+    function convertToGrayscale(data, width, height) {
+      const gray = new Uint8Array(width * height);
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const grayValue = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+        gray[i / 4] = grayValue;
+      }
+      return gray;
+    }
+
+    // Simple edge detection using Sobel operator
+    function detectEdges(grayData, width, height) {
+      const edges = new Uint8Array(width * height);
+      
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = y * width + x;
+          
+          // Sobel X kernel
+          const gx = 
+            -1 * grayData[(y-1) * width + (x-1)] + 1 * grayData[(y-1) * width + (x+1)] +
+            -2 * grayData[y * width + (x-1)] + 2 * grayData[y * width + (x+1)] +
+            -1 * grayData[(y+1) * width + (x-1)] + 1 * grayData[(y+1) * width + (x+1)];
+          
+          // Sobel Y kernel
+          const gy = 
+            -1 * grayData[(y-1) * width + (x-1)] + -2 * grayData[(y-1) * width + x] + -1 * grayData[(y-1) * width + (x+1)] +
+            1 * grayData[(y+1) * width + (x-1)] + 2 * grayData[(y+1) * width + x] + 1 * grayData[(y+1) * width + (x+1)];
+          
+          const magnitude = Math.sqrt(gx * gx + gy * gy);
+          edges[idx] = magnitude > 50 ? 255 : 0; // Threshold for edge detection
+        }
+      }
+      
+      return edges;
+    }
+
+    // Find contours in edge-detected image
+    function findContours(edges, width, height) {
+      const visited = new Array(width * height).fill(false);
+      const contours = [];
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
+          if (edges[idx] === 255 && !visited[idx]) {
+            const contour = traceContour(edges, visited, x, y, width, height);
+            if (contour.length > 20) { // Minimum contour size
+              contours.push(contour);
+            }
+          }
+        }
+      }
+      
+      return contours;
+    }
+
+    // Trace a single contour
+    function traceContour(edges, visited, startX, startY, width, height) {
+      const contour = [];
+      const stack = [{x: startX, y: startY}];
+      
+      while (stack.length > 0) {
+        const {x, y} = stack.pop();
+        const idx = y * width + x;
+        
+        if (x < 0 || x >= width || y < 0 || y >= height || visited[idx] || edges[idx] !== 255) {
+          continue;
+        }
+        
+        visited[idx] = true;
+        contour.push({x, y});
+        
+        // Check 8-connected neighbors
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            stack.push({x: x + dx, y: y + dy});
+          }
+        }
+      }
+      
+      return contour;
+    }
+
+    // Filter contours to identify rectangular panels
+    function filterPanelContours(contours, width, height) {
+      const panels = [];
+      
+      contours.forEach(contour => {
+        if (contour.length < 50) return; // Too small to be a panel
+        
+        // Calculate bounding box
+        let minX = width, maxX = 0, minY = height, maxY = 0;
+        contour.forEach(point => {
+          minX = Math.min(minX, point.x);
+          maxX = Math.max(maxX, point.x);
+          minY = Math.min(minY, point.y);
+          maxY = Math.max(maxY, point.y);
+        });
+        
+        const boxWidth = maxX - minX;
+        const boxHeight = maxY - minY;
+        
+        // Filter based on size and aspect ratio
+        if (boxWidth > 50 && boxHeight > 50 && 
+            boxWidth < width * 0.8 && boxHeight < height * 0.8) {
+          
+          // Check if it's roughly rectangular
+          const area = boxWidth * boxHeight;
+          const contourArea = contour.length;
+          const rectangularity = contourArea / (2 * (boxWidth + boxHeight));
+          
+          if (rectangularity > 0.3 && rectangularity < 3) { // Reasonable rectangularity
+            panels.push({
+              centerX: minX + boxWidth / 2,
+              centerY: minY + boxHeight / 2,
+              width: boxWidth,
+              height: boxHeight,
+              minX, maxX, minY, maxY
+            });
+          }
+        }
+      });
+      
+      // Sort panels by position (top to bottom, right to left for manga)
+      panels.sort((a, b) => {
+        if (Math.abs(a.centerY - b.centerY) < 50) {
+          return b.centerX - a.centerX; // Right to left
+        }
+        return a.centerY - b.centerY; // Top to bottom
+      });
+      
+      return panels;
+    }
+
+    // Analyze a grid cell for content (detect non-white areas)
+    function analyzeGridCell(data, width, startX, endX, startY, endY) {
+      let totalPixels = 0;
+      let contentPixels = 0;
+      
+      for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+          const index = (y * width + x) * 4;
+          const r = data[index];
+          const g = data[index + 1];
+          const b = data[index + 2];
+          
+          totalPixels++;
+          
+          // Consider a pixel as "content" if it's not close to white
+          const brightness = (r + g + b) / 3;
+          if (brightness < 240) { // Not white/very light
+            contentPixels++;
+          }
+        }
+      }
+      
+      return contentPixels / totalPixels;
+    }
+
+    function addSpeechBubbles() {
+      if (mangaImage) {
+        // Use intelligent placement based on image analysis
+        analyzeImageAndPlaceBubbles(mangaImage);
+      } else {
+        // Fallback to grid positioning
+        const positions = calculateBubblePositions();
+        positions.forEach(pos => {
+          createSpeechBubble(pos.x, pos.y);
+        });
+        canvas.renderAll();
+      }
     }
 
     document.getElementById('manga-form').addEventListener('submit', function(e) {
@@ -492,6 +870,35 @@
       }
     });
 
+    document.getElementById('auto-place').addEventListener('click', function() {
+      if (canvas && mangaImage) {
+        // Clear existing bubbles first
+        clearAllBubbles();
+        // Auto-place new bubbles based on image analysis
+        analyzeImageAndPlaceBubbles(mangaImage);
+        console.log('Auto-placed bubbles based on image analysis');
+      } else {
+        console.error('Canvas or manga image not available');
+      }
+    });
+
+    document.getElementById('clear-bubbles').addEventListener('click', function() {
+      if (canvas) {
+        clearAllBubbles();
+        console.log('All bubbles cleared');
+      }
+    });
+
+    // Helper function to clear all speech bubbles
+    function clearAllBubbles() {
+      const objects = canvas.getObjects();
+      const bubblesAndText = objects.filter(obj => 
+        (obj.type === 'ellipse' || obj.type === 'i-text') && obj !== mangaImage
+      );
+      bubblesAndText.forEach(obj => canvas.remove(obj));
+      canvas.renderAll();
+    }
+
     document.getElementById('save-image').addEventListener('click', function() {
       const dataURL = canvas.toDataURL({
         format: 'png',
@@ -504,7 +911,35 @@
       link.click();
     });
 
+    // Resize canvas when window resizes
+    function resizeCanvas() {
+      if (canvas) {
+        const maxWidth = Math.min(800, window.innerWidth - 100);
+        const maxHeight = Math.min(1000, window.innerHeight - 200);
+        
+        canvas.setDimensions({
+          width: maxWidth,
+          height: maxHeight
+        });
+        
+        // Rescale manga image if it exists
+        if (mangaImage) {
+          const scale = Math.min(
+            canvas.width / mangaImage.width,
+            canvas.height / mangaImage.height
+          );
+          mangaImage.scale(scale);
+          mangaImage.set({
+            left: (canvas.width - mangaImage.width * scale) / 2,
+            top: (canvas.height - mangaImage.height * scale) / 2
+          });
+          canvas.renderAll();
+        }
+      }
+    }
+
     window.addEventListener('load', initCanvas);
+    window.addEventListener('resize', resizeCanvas);
   </script>
 </body>
 </html> 

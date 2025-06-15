@@ -24,10 +24,14 @@ def generate():
     style_prompt = data.get('style', 'shoujo manga style, soft colors, detailed backgrounds')
     character_desc = data.get('character', 'a girl with long blue hair and round glasses, wearing a red scarf')
     prompt = (
-        "A Japanese manga page, black and white, with clear panel borders. "
-        "Arrange the panels so that the story is read from right to left, top to bottom, like a traditional Japanese manga. "
+        "A complete Japanese manga page layout, black and white, with 3-4 complete panels that fit entirely within the page boundaries. "
+        "Each panel must be fully visible with complete panel borders - no panels should be cut off at the top, bottom, or sides of the page. "
+        "Arrange the panels in a traditional Japanese manga layout (right to left, top to bottom reading order). "
+        "Leave adequate margins around all panels so they are completely contained within the page. "
+        "Each panel should show a complete scene with full character bodies and complete backgrounds visible. "
         "DO NOT include any speech bubbles, text, dialogue, or onomatopoeia in the image. "
         "Show only the visual story panels with characters and backgrounds. "
+        "Ensure all panels are complete rectangles with clear, unbroken borders. "
         f"Story: {story_prompt} "
         f"Main character: {character_desc} "
         f"Style: {style_prompt} "
