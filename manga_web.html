@@ -2,42 +2,322 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manga Page Generator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 2em; }
-    #canvas-container { margin-top: 1em; border: 1px solid #ccc; }
-    #loading { display: none; color: #888; }
-    label { display: block; margin-top: 1em; }
-    .controls { margin-top: 1em; }
-    button { margin-right: 0.5em; }
-    textarea { width: 100%; max-width: 600px; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 2rem;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      height: fit-content;
+      position: sticky;
+      top: 2rem;
+    }
+
+    .main-content {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      background: #f8fafc;
+    }
+
+    textarea:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+      margin-right: 1rem;
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #667eea;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .canvas-wrapper {
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 1rem;
+      border: 2px solid #e2e8f0;
+      overflow: hidden;
+    }
+
+    #manga-canvas {
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      max-width: 100%;
+      height: auto;
+    }
+
+    .feature-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1rem;
+    }
+
+    .tips {
+      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+      color: white;
+      padding: 1rem;
+      border-radius: 12px;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .tips h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .tips ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .tips li {
+      margin-bottom: 0.25rem;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .tips li::before {
+      content: '✨';
+      position: absolute;
+      left: 0;
+    }
+
+    @media (max-width: 1024px) {
+      .container {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      
+      .sidebar {
+        position: static;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+      
+      .sidebar, .main-content {
+        padding: 1.5rem;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .controls {
+        flex-direction: column;
+      }
+      
+      .btn-secondary {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+      }
+    }
   </style>
 </head>
 <body>
-  <h2>Manga Page Generator</h2>
-  <form id="manga-form">
-    <label>
-      Story:
-      <textarea id="story" rows="4" cols="60" required>A young student discovers she can talk to cats. One day, while walking home from school, she meets a mysterious black cat who tells her about a hidden magical world existing parallel to our own. The cat becomes her guide to this new realm.</textarea>
-    </label>
-    <label>
-      Style:
-      <input id="style" type="text" value="shoujo manga style, soft colors, detailed backgrounds" size="60"/>
-    </label>
-    <label>
-      Character:
-      <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" size="60"/>
-    </label>
-    <button type="submit">Generate Manga Page</button>
-  </form>
-  <div id="loading">Generating image, please wait...</div>
-  <div class="controls">
-    <button id="add-bubble">Add Speech Bubble</button>
-    <button id="save-image">Save Image</button>
-  </div>
-  <div id="canvas-container">
-    <canvas id="manga-canvas"></canvas>
+  <div class="container">
+    <div class="sidebar">
+      <h1>Manga Generator</h1>
+      <div class="feature-badge">AI Powered</div>
+      
+      <form id="manga-form">
+        <div class="form-group">
+          <label for="story">Story</label>
+          <textarea id="story" required placeholder="Describe your manga story...">A young student discovers she can talk to cats. One day, while walking home from school, she meets a mysterious black cat who tells her about a hidden magical world existing parallel to our own. The cat becomes her guide to this new realm.</textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="style">Art Style</label>
+          <input id="style" type="text" value="shoujo manga style, soft colors, detailed backgrounds" placeholder="Describe the art style..."/>
+        </div>
+        
+        <div class="form-group">
+          <label for="character">Main Character</label>
+          <input id="character" type="text" value="a girl with long blue hair and round glasses, wearing a red scarf" placeholder="Describe the main character..."/>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Generate Manga Page</button>
+      </form>
+
+      <div class="tips">
+        <h3>💡 Tips</h3>
+        <ul>
+          <li>Double-click text to edit speech bubbles</li>
+          <li>Drag bubbles to reposition them</li>
+          <li>Use descriptive stories for better results</li>
+          <li>Try different art styles (shoujo, seinen, etc.)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <h2>Your Manga Page</h2>
+      
+      <div class="loading" id="loading">
+        Generating your manga page...
+      </div>
+      
+      <div class="controls">
+        <button id="add-bubble" class="btn btn-secondary">+ Add Speech Bubble</button>
+        <button id="save-image" class="btn btn-secondary">💾 Save Image</button>
+      </div>
+      
+      <div class="canvas-wrapper">
+        <canvas id="manga-canvas"></canvas>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -70,8 +350,8 @@
         rx: 100,
         ry: 60,
         fill: 'white',
-        stroke: 'black',
-        strokeWidth: 2,
+        stroke: '#667eea',
+        strokeWidth: 3,
         originX: 'center',
         originY: 'center',
         selectable: true
@@ -82,21 +362,22 @@
         left: x,
         top: y,
         fontSize: 18,
-        fontFamily: 'Arial',
-        fill: 'black',
+        fontFamily: 'Segoe UI, sans-serif',
+        fill: '#2d3748',
         textAlign: 'center',
         originX: 'center',
         originY: 'center',
         selectable: true,
         editable: true,
-        editingBorderColor: 'blue',
-        selectionColor: 'rgba(0, 0, 255, 0.3)',
-        cursorColor: 'blue'
+        editingBorderColor: '#667eea',
+        selectionColor: 'rgba(102, 126, 234, 0.3)',
+        cursorColor: '#667eea'
       });
 
       // Add both objects to canvas separately
       canvas.add(oval);
       canvas.add(text);
+      console.log('Added oval and text to canvas at:', x, y);
 
       // Store reference to paired object
       oval.pairedText = text;
@@ -202,8 +483,13 @@
     });
 
     document.getElementById('add-bubble').addEventListener('click', function() {
-      createSpeechBubble(canvas.width / 2, canvas.height / 2);
-      canvas.renderAll();
+      if (canvas) {
+        const bubble = createSpeechBubble(canvas.width / 2, canvas.height / 2);
+        canvas.renderAll();
+        console.log('Speech bubble added:', bubble);
+      } else {
+        console.error('Canvas not initialized');
+      }
     });
 
     document.getElementById('save-image').addEventListener('click', function() {
