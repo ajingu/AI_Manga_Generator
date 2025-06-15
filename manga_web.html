@@ -704,11 +704,13 @@
         selectable: true,
         // Add slight irregularity for hand-drawn manga look
         scaleX: 1 + (Math.random() - 0.5) * 0.1,
-        scaleY: 1 + (Math.random() - 0.5) * 0.1
+        scaleY: 1 + (Math.random() - 0.5) * 0.1,
+        // Add type for identification
+        type: 'speechBubble'
       });
 
-      // Create editable text
-      const textObj = new fabric.IText(text, {
+      // Create text (using regular Text instead of IText)
+      const textObj = new fabric.Text(text, {
         left: x,
         top: y,
         fontSize: 18,
@@ -719,22 +721,10 @@
         originX: 'center',
         originY: 'center',
         selectable: true,
-        editable: true,
-        editingBorderColor: '#667eea',
-        selectionColor: 'rgba(102, 126, 234, 0.3)',
-        cursorColor: '#667eea',
-        backgroundColor: 'transparent',
-        padding: 5,
-        borderColor: '#667eea',
-        cornerColor: '#667eea',
-        cornerSize: 6,
-        transparentCorners: false,
         width: rx * 1.5,
         breakWords: true,
-        splitByGrapheme: false,
-        lockUniScaling: true,
-        hasControls: false,
-        hasBorders: false
+        // Add type for identification
+        type: 'speechBubbleText'
       });
 
       // Add objects to canvas
@@ -760,6 +750,56 @@
       oval.isUpdating = false;
       textObj.isUpdating = false;
       
+      // Handle double click to edit
+      textObj.on('mousedblclick', function() {
+        // Create temporary IText for editing
+        const editableText = new fabric.IText(this.text, {
+          left: this.left,
+          top: this.top,
+          fontSize: this.fontSize,
+          fontFamily: this.fontFamily,
+          fontWeight: this.fontWeight,
+          fill: this.fill,
+          textAlign: this.textAlign,
+          originX: this.originX,
+          originY: this.originY,
+          width: this.width,
+          breakWords: true,
+          editingBorderColor: '#667eea',
+          cursorColor: '#667eea'
+        });
+        
+        // Remove the regular text temporarily
+        canvas.remove(this);
+        
+        // Add and activate the IText
+        canvas.add(editableText);
+        canvas.setActiveObject(editableText);
+        editableText.enterEditing();
+        canvas.renderAll();
+        
+        // Handle editing completion
+        editableText.on('editing:exited', function() {
+          // Update the original text object
+          textObj.set({
+            'text': this.text,
+            'width': rx * 1.5  // Ensure width is set for wrapping
+          });
+          
+          // Remove the temporary IText
+          canvas.remove(this);
+          
+          // Add back the original text
+          canvas.add(textObj);
+          canvas.bringToFront(textObj);
+          
+          // Fit text to bubble
+          fitTextToBubble(textObj, oval);
+          
+          canvas.renderAll();
+        });
+      });
+      
       oval.on('moving', function() {
         if (this.pairedText && !this.isUpdating && !this.pairedText.isUpdating) {
           this.pairedText.isUpdating = true;
@@ -784,34 +824,22 @@
         }
       });
 
-      // Handle text editing start
-      textObj.on('editing:entered', function() {
-        this.set({ width: 'auto' });
-        canvas.renderAll();
-      });
-
-      // Handle text editing completion
-      textObj.on('editing:exited', function() {
-        const currentOffsetX = this.left - this.pairedOval.left;
-        const currentOffsetY = this.top - this.pairedOval.top;
-        
-        fitTextToBubble(this, this.pairedOval, true);
-        
-        this.set({
-          left: this.pairedOval.left + currentOffsetX,
-          top: this.pairedOval.top + currentOffsetY
-        });
-        this.pairedOval.textOffsetX = currentOffsetX;
-        this.pairedOval.textOffsetY = currentOffsetY;
-        
-        canvas.bringToFront(this);
-        canvas.renderAll();
-      });
-
       // Fit text into the bubble initially
       fitTextToBubble(textObj, oval);
 
       return { oval, textObj };
+    }
+
+    // Function to clear all speech bubbles
+    function clearSpeechBubbles() {
+      const objects = canvas.getObjects();
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        if (obj.type === 'speechBubble' || obj.type === 'speechBubbleText') {
+          canvas.remove(obj);
+        }
+      }
+      canvas.renderAll();
     }
 
     // Create authentic manga-style speech bubble
@@ -1377,7 +1405,7 @@
     document.getElementById('auto-place').addEventListener('click', function() {
       if (canvas && mangaImage) {
         // Clear existing bubbles first
-        clearAllBubbles();
+        clearSpeechBubbles();
         // Auto-place new bubbles based on image analysis
         analyzeImageAndPlaceBubbles(mangaImage);
         console.log('Auto-placed bubbles based on image analysis');
@@ -1388,20 +1416,10 @@
 
     document.getElementById('clear-bubbles').addEventListener('click', function() {
       if (canvas) {
-        clearAllBubbles();
+        clearSpeechBubbles();
         console.log('All bubbles cleared');
       }
     });
-
-    // Helper function to clear all speech bubbles
-    function clearAllBubbles() {
-      const objects = canvas.getObjects();
-      const bubblesAndText = objects.filter(obj => 
-        (obj.type === 'ellipse' || obj.type === 'i-text') && obj !== mangaImage
-      );
-      bubblesAndText.forEach(obj => canvas.remove(obj));
-      canvas.renderAll();
-    }
 
     document.getElementById('save-image').addEventListener('click', function() {
       const dataURL = canvas.toDataURL({
