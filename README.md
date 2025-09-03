@@ -2,7 +2,7 @@
 
 A web application that uses AI to generate a single manga page from a story prompt. Users can then interactively add and edit speech bubbles with AI-generated dialogue onto the page.
 
- <!-- It's a good idea to add a real screenshot here -->
+https://github.com/user-attachments/assets/7223f016-7a3a-44c4-80b4-19f5233316a2
 
 ## Features
 
